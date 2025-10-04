@@ -6,13 +6,13 @@
 <title>Timetable Command Center - Veer Patta Public School</title>
 
 <!-- LIBRARIES (CDN) -->
-<script src="<https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js>"></script>
-<script src="<https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js>"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"></script>
 
 <!-- FONTS -->
-<link rel="preconnect" href="<https://fonts.googleapis.com>">
-<link rel="preconnect" href="<https://fonts.gstatic.com>" crossorigin>
-<link href="<https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap>" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
 <!-- STYLES -->
 <style>
@@ -908,11 +908,11 @@ const parseTimetableData = () => {
     const teacherDetails = {};
     let headers = [];
 
-    const correctedData = rawData.replace(/\\(Nindika\\)/g, '(Nidhika)').replace(/\\s+Sir/g, '');
-    const dayBlocks = correctedData.trim().split(/\\n\\s*(?=Tuesday|Wednesday|Thursday|Friday|Saturday)/);
+    const correctedData = rawData.replace(/\(Nindika\)/g, '(Nidhika)').replace(/\s+Sir/g, '');
+    const dayBlocks = correctedData.trim().split(/\n\s*(?=Tuesday|Wednesday|Thursday|Friday|Saturday)/);
 
     dayBlocks.forEach((block, index) => {
-        const lines = block.trim().split('\\n');
+        const lines = block.trim().split('\n');
         const day = lines[0].trim();
         timetable[day] = {};
 
@@ -931,7 +931,7 @@ const parseTimetableData = () => {
             timetable[day][className] = [];
 
             columns.slice(1).forEach((cell, periodIndex) => {
-                const match = cell.trim().match(/^(.+?)\\s*\\(([^)]+)\\)$/);
+                const match = cell.trim().match(/^(.+?)\s*\(([^)]+)\)$/);
                 let entry = { subject: cell.trim(), teacher: null, period: periodIndex, className, day };
                 if (match) {
                     entry.subject = match[1].trim();
@@ -961,8 +961,8 @@ const parseTimetableData = () => {
     });
 
     const classNames = Object.keys(timetable.Monday || {}).sort((a,b) => {
-        const numA = parseInt(a.match(/\\d+/)?.[0]);
-        const numB = parseInt(b.match(/\\d+/)?.[0]);
+        const numA = parseInt(a.match(/\d+/)?.[0]);
+        const numB = parseInt(b.match(/\d+/)?.[0]);
         if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
         return a.localeCompare(b);
     });
