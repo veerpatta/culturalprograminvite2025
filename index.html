@@ -2371,8 +2371,8 @@
 				const { periodHeaders, teacherDetails } = state.allData;
 				const absentTeachers = state.substitutions[day]?.absentTeachers || [];
 				
-				if (Object.keys(daySubsData).length === 0) {
-					showToast('⚠️ No substitution plan available to share', 3000, 'warning');
+				if (absentTeachers.length === 0) {
+					showToast('⚠️ No absent teachers selected', 3000, 'warning');
 					return;
 				}
 
@@ -2387,18 +2387,16 @@
 					if (schedule) {
 						schedule.forEach((period, periodIndex) => {
 							if (period) {
-								const substitute = daySubsData[period.className]?.[periodIndex];
-								if (substitute) {
-									if (!classPlan[period.className]) {
-										classPlan[period.className] = [];
-									}
-									classPlan[period.className].push({
-										period: periodHeaders[periodIndex].name,
-										subject: period.subject,
-										originalTeacher: absentTeacher,
-										substitute: substitute
-									});
+								const substitute = daySubsData[period.className]?.[periodIndex] || '--';
+								if (!classPlan[period.className]) {
+									classPlan[period.className] = [];
 								}
+								classPlan[period.className].push({
+									period: periodHeaders[periodIndex].name,
+									subject: period.subject,
+									originalTeacher: absentTeacher,
+									substitute: substitute
+								});
 							}
 						});
 					}
@@ -2442,6 +2440,9 @@
 					captureElement.style.display = prevCapture;
 					canvas.toBlob(blob => {
 						try {
+							if (!blob) {
+								throw new Error('Failed to create image blob');
+							}
 							const url = URL.createObjectURL(blob);
 							const a = document.createElement('a');
 							a.href = url;
@@ -2454,6 +2455,10 @@
 							showToast('❌ Failed to download image', 3000, 'error');
 						}
 					});
+				}).catch(error => {
+					captureElement.style.display = prevCapture;
+					console.error('html2canvas error:', error);
+					showToast('❌ Failed to capture screenshot', 3000, 'error');
 				});
 			} catch (error) {
 				console.error('Screenshot error:', error);
