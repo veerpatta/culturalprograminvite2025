@@ -2168,33 +2168,252 @@
 			const absentTeachers = selectedCheckboxes.map(cb => cb.value);
 			renderSubstitutionView(day, absentTeachers);
 		}
-		// ...existing code...
 
-		// --- ADD PRINT BUTTON TO ALL MAIN VIEWS ---
-		// In renderDashboard, renderDayView, renderClassView, renderTeacherView, add:
-		// <button onclick="handlePrint()" class="button button-secondary" style="max-width:200px;"><i data-lucide="printer"></i> Print Full Timetable</button>
-		// (Already present in Substitution view above.)
+		// --- VIEW SWITCHING ---
+		function switchView(view) {
+			// Clear intervals
+			if (window.dashboardInterval) {
+				clearInterval(window.dashboardInterval);
+				window.dashboardInterval = null;
+			}
 
-		// Example for Dashboard:
-		// ...existing code...
-		const html = `
-			<div class="stat-grid"> ... </div>
-			<div class="card"> ... </div>
-			<div class="card"> ... </div>
-			<div class="flex justify-center gap-4" style="margin-top: 1.5rem;">
-				<button onclick="handlePrint()" class="button button-secondary" style="max-width:200px;">
-					<i data-lucide="printer"></i> Print Full Timetable
-				</button>
-			</div>
-		`;
-		// ...existing code...
+			state.currentView = view;
+			
+			// Update navigation
+			document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
+			const activeBtn = document.getElementById(`nav-${view}`);
+			if (activeBtn) activeBtn.classList.add('active');
 
-		// Do the same for renderDayView, renderClassView, renderTeacherView (add the print button at the bottom).
+			// Render view
+			switch(view) {
+				case 'Dashboard':
+					renderDashboard();
+					break;
+				case 'Day':
+					renderDayView();
+					break;
+				case 'Substitution':
+					renderSubstitutionView();
+					break;
+				case 'Class':
+					renderClassView();
+					break;
+				case 'Teacher':
+					renderTeacherView();
+					break;
+				default:
+					renderDashboard();
+			}
+		}
 
-		// ...existing code...
-	</script>
-</body>
-</html>
+		// --- SUBSTITUTION MANAGEMENT ---
+		function handleGeneratePlan(day, absentTeachers) {
+			try {
+				if (!day || !absentTeachers || absentTeachers.length === 0) {
+					showToast('⚠️ Please select at least one absent teacher', 3000, 'warning');
+					return;
+				}
+
+				const { teacherDetails, timetable } = state.allData;
+				const vacantSlots = [];
+
+				// Find all slots that need substitution
+				absentTeachers.forEach(teacher => {
+					const schedule = teacherDetails[teacher]?.schedule[day];
+					if (schedule) {
+						schedule.forEach((period, periodIndex) => {
+							if (period) {
+								vacantSlots.push({
+									...period,
+									periodIndex,
+									originalTeacher: teacher
+								});
+							}
+						});
+					}
+				});
+
+				// Initialize substitution structure if needed
+				if (!state.substitutions[day]) {
+					state.substitutions[day] = { plan: {}, absentTeachers: [] };
+				}
+				state.substitutions[day].absentTeachers = [...absentTeachers];
+				
+				// Clear existing plan for these slots
+				vacantSlots.forEach(slot => {
+					if (!state.substitutions[day].plan[slot.className]) {
+						state.substitutions[day].plan[slot.className] = {};
+					}
+					delete state.substitutions[day].plan[slot.className][slot.periodIndex];
+				});
+
+				// Generate new plan
+				const newPlan = state.substitutions[day].plan;
+				vacantSlots.forEach(slot => {
+					const freeTeachers = findFreeTeachers(
+						day, 
+						slot.periodIndex, 
+						absentTeachers, 
+						newPlan
+					);
+					
+					if (freeTeachers.length > 0) {
+						if (!newPlan[slot.className]) {
+							newPlan[slot.className] = {};
+						}
+						newPlan[slot.className][slot.periodIndex] = freeTeachers[0];
+					}
+				});
+
+				// Save updated plan
+				state.substitutions[day].plan = newPlan;
+				showToast('✅ Substitution plan generated successfully!', 3000, 'success');
+				renderSubstitutionView(day, absentTeachers);
+				
+			} catch (error) {
+				console.error('Error generating substitution plan:', error);
+				showToast('❌ Failed to generate substitution plan', 3000, 'error');
+			}
+		}
+
+		function handleResetPlan(day) {
+			try {
+				if (!day) {
+					showToast('⚠️ No day selected', 3000, 'warning');
+					return;
+				}
+
+				if (!state.substitutions[day] || !state.substitutions[day].plan) {
+					showToast('ℹ️ No substitution plan exists for this day', 3000, 'info');
+					return;
+				}
+
+				const confirmReset = confirm(`Are you sure you want to reset the substitution plan for ${day}?`);
+				if (!confirmReset) return;
+
+				const absentTeachers = state.substitutions[day].absentTeachers || [];
+				state.substitutions[day] = { plan: {}, absentTeachers };
+				
+				showToast('✅ Substitution plan reset successfully', 3000, 'success');
+				renderSubstitutionView(day, absentTeachers);
+				
+			} catch (error) {
+				console.error('Error resetting substitution plan:', error);
+				showToast('❌ Failed to reset substitution plan', 3000, 'error');
+			}
+		}
+
+		function handleShareScreenshot() {
+			try {
+				const captureElement = document.getElementById('print-capture-area');
+				const content = document.getElementById('main-content');
+				
+				// Prepare capture area
+				const prevCapture = captureElement.style.display;
+				document.getElementById('print-content').innerHTML = content.innerHTML;
+				captureElement.style.display = 'block';
+				
+				html2canvas(captureElement).then(canvas => {
+					captureElement.style.display = prevCapture;
+					canvas.toBlob(blob => {
+						try {
+							const file = new File([blob], 'timetable.png', { type: 'image/png' });
+							
+							// Check if Web Share API is available
+							if (navigator.share) {
+								navigator.share({
+									files: [file],
+									title: 'Veer Patta Public School Timetable',
+								}).catch(err => {
+									console.error('Share failed:', err);
+									showToast('⚠️ Sharing failed. Image downloaded instead.', 3000, 'warning');
+									// Fallback to download
+									const url = URL.createObjectURL(blob);
+									const a = document.createElement('a');
+									a.href = url;
+									a.download = 'timetable.png';
+									a.click();
+									URL.revokeObjectURL(url);
+								});
+							} else {
+								// If Web Share API is not available, download the image
+								const url = URL.createObjectURL(blob);
+								const a = document.createElement('a');
+								a.href = url;
+								a.download = 'timetable.png';
+								a.click();
+								URL.revokeObjectURL(url);
+								showToast('✅ Timetable image downloaded', 3000, 'success');
+							}
+						} catch (error) {
+							console.error('Error sharing/downloading:', error);
+							showToast('❌ Failed to share/download image', 3000, 'error');
+						}
+					});
+				});
+			} catch (error) {
+				console.error('Screenshot error:', error);
+				showToast('❌ Failed to capture screenshot', 3000, 'error');
+			}
+		}
+
+		// --- INITIALIZATION FUNCTION ---
+		async function init() {
+			try {
+				// Parse data
+				state.allData = parseTimetableData();
+				console.log('Initialized with data:', state.allData.days);
+				
+				// Initialize substitutions structure
+				state.allData.days.forEach(day => {
+					if (!state.substitutions[day]) {
+						state.substitutions[day] = { plan: {}, absentTeachers: [] };
+					}
+				});
+				
+				// Render initial view
+				switchView('Dashboard');
+				
+				// Set up toast style
+				const style = document.createElement('style');
+				style.innerHTML = `
+				.toast-notification {
+					position: fixed;
+					top: 20px;
+					right: 20px;
+					z-index: 10000;
+					background: var(--primary-600);
+					color: white;
+					padding: 0.75rem 1rem;
+					border-radius: var(--radius);
+					box-shadow: var(--shadow-lg);
+					transition: all 0.3s ease;
+					font-size: 0.875rem;
+					font-weight: 500;
+					max-width: 300px;
+					opacity: 1;
+				}
+				.toast-notification.error {
+					background: var(--red-500);
+				}
+				.toast-notification.success {
+					background: var(--green-500);
+				}
+				.toast-notification.warning {
+					background: var(--yellow-500);
+				}
+				@keyframes pulse {
+					0%, 100% { opacity: 1; }
+					50% { opacity: .5; }
+				}
+			`;
+			document.head.appendChild(style);
+			
+			// Hide loader after a delay for smoother UX
+			setTimeout(() => {
+				const loader = document.getElementById('loader');
+				loader.style.opacity = '0';
+				setTimeout(() => {
 					loader.style.display = 'none';
 				}, 300);
 
@@ -2212,30 +2431,31 @@
 				});
 
 				showToast('📚 Timetable Command Center loaded successfully!', 2000, 'success');
+			}, 300);
+			
 			} catch (error) {
 				console.error('Initialization error:', error);
 				showToast('❌ Failed to load timetable data', 5000, 'error');
 				
 				// Show fallback content
 				mainContent.innerHTML = `
-					<div class="card">
-						<div style="color: var(--red-500); padding: 2rem; text-align: center;">
-							<i data-lucide="alert-circle" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i><br>
-							<h3>Initialization Error</h3>
-							<p>Failed to load the timetable application. Please refresh the page.</p>
-							<button onclick="window.location.reload()" class="button button-primary" style="margin-top: 1rem; max-width: 200px;">
-								Reload Page
-							</button>
-						</div>
+				<div class="card">
+					<div style="color: var(--red-500); padding: 2rem; text-align: center;">
+						<i data-lucide="alert-circle" style="width: 48px; height: 48px; margin-bottom: 1rem;"></i><br>
+						<h3>Initialization Error</h3>
+						<p>Failed to load the timetable application. Please refresh the page.</p>
+						<button onclick="window.location.reload()" class="button button-primary" style="margin-top: 1rem; max-width: 200px;">
+							Reload Page
+						</button>
 					</div>
+				</div>
 				`;
+				lucide.createIcons();
 			}
 		}
 
+		// Initialize app when window loads
 		window.onload = init;
-
-		// --- REMAINING FUNCTIONS ---
-		// ...existing code for renderSubstitutionView, handleGeneratePlan, etc...
 	</script>
 </body>
 </html>
