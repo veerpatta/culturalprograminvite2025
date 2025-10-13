@@ -2105,6 +2105,14 @@
 									<tbody>${tableRows}</tbody>
 								</table>
 							</div>
+							<div class="grid grid-cols-1 grid-cols-md-2 gap-4" style="margin-top: 1.5rem;">
+								<button onclick="handleShareSubstitutionWhatsApp('${selectedDay}')" class="button button-whatsapp">
+									<i data-lucide="share-2"></i> Share via WhatsApp
+								</button>
+								<button onclick="handleDownloadSubstitutionImage('${selectedDay}')" class="button button-primary">
+									<i data-lucide="download"></i> Download as Image
+								</button>
+							</div>
 						</div>
 					</div>
 				`;
@@ -2350,6 +2358,113 @@
 							showToast('❌ Failed to share/download image', 3000, 'error');
 						}
 					});
+				});
+			} catch (error) {
+				console.error('Screenshot error:', error);
+				showToast('❌ Failed to capture screenshot', 3000, 'error');
+			}
+		}
+
+		function handleShareSubstitutionWhatsApp(day) {
+			try {
+				const daySubsData = state.substitutions[day]?.plan || {};
+				const { periodHeaders, teacherDetails } = state.allData;
+				const absentTeachers = state.substitutions[day]?.absentTeachers || [];
+				
+				if (absentTeachers.length === 0) {
+					showToast('⚠️ No absent teachers selected', 3000, 'warning');
+					return;
+				}
+
+				// Build formatted text
+				let message = `📋 *Substitution Plan - ${day}*\n`;
+				message += `Veer Patta Public School\n\n`;
+				
+				// Group by class
+				const classPlan = {};
+				absentTeachers.forEach(absentTeacher => {
+					const schedule = teacherDetails[absentTeacher]?.schedule[day];
+					if (schedule) {
+						schedule.forEach((period, periodIndex) => {
+							if (period) {
+								const substitute = daySubsData[period.className]?.[periodIndex] || '--';
+								if (!classPlan[period.className]) {
+									classPlan[period.className] = [];
+								}
+								classPlan[period.className].push({
+									period: periodHeaders[periodIndex].name,
+									subject: period.subject,
+									originalTeacher: absentTeacher,
+									substitute: substitute
+								});
+							}
+						});
+					}
+				});
+
+				// Validate we have periods to share
+				if (Object.keys(classPlan).length === 0) {
+					showToast('⚠️ No periods found for selected teachers', 3000, 'warning');
+					return;
+				}
+
+				// Format the message
+				for (const [className, periods] of Object.entries(classPlan)) {
+					message += `*${className}*\n`;
+					periods.forEach(p => {
+						message += `${p.period}: ${p.subject}\n`;
+						message += `Teacher: ${p.substitute} (for ${p.originalTeacher})\n\n`;
+					});
+				}
+
+				// Encode and open WhatsApp
+				const encodedMessage = encodeURIComponent(message);
+				const whatsappUrl = `https://wa.me/?text=${encodedMessage}`;
+				window.open(whatsappUrl, '_blank');
+				showToast('✅ Opening WhatsApp...', 3000, 'success');
+			} catch (error) {
+				console.error('Error sharing via WhatsApp:', error);
+				showToast('❌ Failed to share via WhatsApp', 3000, 'error');
+			}
+		}
+
+		function handleDownloadSubstitutionImage(day) {
+			try {
+				const planContent = document.getElementById('substitution-plan-content');
+				if (!planContent) {
+					showToast('⚠️ No substitution plan available to download', 3000, 'warning');
+					return;
+				}
+
+				const captureElement = document.getElementById('print-capture-area');
+				const prevCapture = captureElement.style.display;
+				document.getElementById('print-header-subtitle').textContent = `Substitution Plan for ${day}`;
+				document.getElementById('print-content').innerHTML = planContent.innerHTML;
+				captureElement.style.display = 'block';
+				
+				html2canvas(captureElement).then(canvas => {
+					captureElement.style.display = prevCapture;
+					canvas.toBlob(blob => {
+						try {
+							if (!blob) {
+								throw new Error('Failed to create image blob');
+							}
+							const url = URL.createObjectURL(blob);
+							const a = document.createElement('a');
+							a.href = url;
+							a.download = `substitution-plan-${day}.png`;
+							a.click();
+							URL.revokeObjectURL(url);
+							showToast('✅ Substitution plan image downloaded', 3000, 'success');
+						} catch (error) {
+							console.error('Error downloading:', error);
+							showToast('❌ Failed to download image', 3000, 'error');
+						}
+					});
+				}).catch(error => {
+					captureElement.style.display = prevCapture;
+					console.error('html2canvas error:', error);
+					showToast('❌ Failed to capture screenshot', 3000, 'error');
 				});
 			} catch (error) {
 				console.error('Screenshot error:', error);
