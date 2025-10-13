@@ -2402,6 +2402,12 @@
 					}
 				});
 
+				// Validate we have periods to share
+				if (Object.keys(classPlan).length === 0) {
+					showToast('⚠️ No periods found for selected teachers', 3000, 'warning');
+					return;
+				}
+
 				// Format the message
 				for (const [className, periods] of Object.entries(classPlan)) {
 					message += `*${className}*\n`;
