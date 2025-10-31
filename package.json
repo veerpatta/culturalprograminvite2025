@@ -1,0 +1,41 @@
+{
+  "name": "veer-patta-timetable-command-center",
+  "version": "2.0.0",
+  "description": "Modern timetable management system for Veer Patta Public School with intelligent teacher substitution features",
+  "type": "module",
+  "main": "js/app.js",
+  "scripts": {
+    "dev": "npx http-server -p 8080 -c-1",
+    "start": "npx http-server -p 8080",
+    "preview": "npx http-server -p 8080 -o",
+    "lint": "eslint js/**/*.js",
+    "format": "prettier --write \"**/*.{js,html,css,md}\"",
+    "validate": "npm run lint && echo 'All checks passed!'"
+  },
+  "keywords": [
+    "timetable",
+    "school-management",
+    "education",
+    "scheduling",
+    "teacher-substitution"
+  ],
+  "author": "Veer Patta Public School",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "http-server": "^14.1.1",
+    "prettier": "^3.1.0"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/veerpatta/culturalprograminvite2025"
+  },
+  "bugs": {
+    "url": "https://github.com/veerpatta/culturalprograminvite2025/issues"
+  },
+  "homepage": "https://github.com/veerpatta/culturalprograminvite2025#readme"
+}
